@@ -12,6 +12,5 @@ namespace HotelListing.API.Repository
         }
         // Implement any additional methods specific to hotels here
     }
-    {
-    }
+
 }
