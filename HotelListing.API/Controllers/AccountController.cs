@@ -1,5 +1,5 @@
-﻿using HotelListing.API.Contracts;
-using HotelListing.API.Models.Users;
+﻿using HotelListing.API.Core.Contracts;
+using HotelListing.API.Core.Models.Users;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +10,12 @@ namespace HotelListing.API.Controllers
     public class AccountController : ControllerBase
     {
         private readonly IAuthManager _authManager;
+        private readonly ILogger<AccountController> _logger;
 
-        public AccountController(IAuthManager authManager)
+        public AccountController(IAuthManager authManager, ILogger<AccountController> logger)
         {
             this._authManager = authManager;
+            this._logger = logger;
         }
 
         [HttpPost("register")]
@@ -22,19 +24,32 @@ namespace HotelListing.API.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> Register([FromBody] ApiUserDTO apiUserDTO)
         {
-            var errors = await _authManager.Register(apiUserDTO);
+            _logger.LogInformation($"Registration attempt for {apiUserDTO.Email} started at {DateTime.UtcNow}");
 
-            if (errors.Any())
+            try
             {
-                foreach(var error in errors)
+                var errors = await _authManager.Register(apiUserDTO);
+
+                if (errors.Any())
                 {
-                    ModelState.AddModelError(error.Code, error.Description);
+                    foreach (var error in errors)
+                    {
+                        ModelState.AddModelError(error.Code, error.Description);
+                    }
+
+                    return BadRequest(ModelState);
                 }
 
-                return BadRequest(ModelState);
+                return Ok(new { Message = "User registered successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Something went wrong in the {nameof(Register)} action {ex.Message} - User registration" +
+                    $" attmpet for {apiUserDTO.Email}");
+                return Problem($"Something went wrong in the {nameof(Register)}. Please contact support", statusCode: 500);
             }
 
-            return Ok(new { Message = "User registered successfully" });
+            
 
         }
 
@@ -44,14 +59,27 @@ namespace HotelListing.API.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult> Login([FromBody] LoginDTO logInUserDTO)
         {
-            var authResponse = await _authManager.Login(logInUserDTO);
+            _logger.LogInformation($"Login attempt for {logInUserDTO.Email} started at {DateTime.UtcNow}");
 
-            if (authResponse == null)
+            try
             {
-                return Unauthorized(new { Message = "Invalid credentials" });
-            }
+                var authResponse = await _authManager.Login(logInUserDTO);
 
-            return Ok(new { Message = "User logged in successfully" });
+                if (authResponse == null)
+                {
+                    return Unauthorized(new { Message = "Invalid credentials" });
+                }
+
+                return Ok(new { Message = "User logged in successfully" });
+            }
+            catch (Exception ex)
+            {
+
+                _logger.LogError($"Something went wrong in the {nameof(Login)} action {ex.Message} - User login" +
+                    $" attmpet for {logInUserDTO.Email}");
+                return Problem($"Something went wrong in the {nameof(Login)}. Please contact support", statusCode: 500);
+            }
+            
 
         }
 
